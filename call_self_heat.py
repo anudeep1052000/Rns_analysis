@@ -1,11 +1,17 @@
 import subprocess
 import numpy as np
 
-def run_self_heat(rho, T=1000000000.0, other_args=None):
+def run_self_heat(dt,rho, T=1000000000.0,xp=0,xhe4=0,xc12=0.5,xo16=0.5,xne20=0,xna23=0,xmg24=0,other_args=None):
     script_path = 'self_heat.py'
     work_dir = './self_heating_network'  # where helm_table.dat should be
-    cmd = ['python3', script_path, '-rho', str(rho),'-xhe4',str(0),'-xc12',str(0.5),'-xo16',str(0.5)]
-    
+    cmd = [
+    'python3', script_path,
+    '-rho', str(rho),
+    '-T', str(T),
+    '-abundance_list',str(xp), str(xhe4) ,str(xc12) ,str(xo16), str(xne20),str(xna23),str(xmg24),
+    '-tmax', str(dt)
+]
+    print(cmd)
     result = subprocess.run(cmd, cwd=work_dir, capture_output=True, text=True)
 
     if result.returncode != 0:
@@ -36,6 +42,13 @@ def run_self_heat(rho, T=1000000000.0, other_args=None):
     sum_eps_nu = 0.0
     sum_cv = 0.0
     count = 0
+    x_c12 =0
+    x_o16 = 0
+    x_he4 = 0
+    x_p = 0
+    x_ne20 = 0
+    x_na23 = 0
+    x_mg24 = 0
 
     for line in data_lines:
         parts = line.split()
@@ -58,9 +71,28 @@ def run_self_heat(rho, T=1000000000.0, other_args=None):
     else:
     # Handle empty file or no data case
         avg_eps_nuc = avg_eps_nu = avg_cv = 0.0
+    output_file2 = "self_heating_network/abundances_vs_time.dat"
+    with open(output_file2,'r') as f:
+        lines = f.readlines()
+        data_lines = [line for line in lines if not line.startswith("#") and line.strip()]
+        if data_lines:
+            last_line = data_lines[-1]
+            parts = last_line.split()
+            #if len(parts) < 8:
+            x_p = float(parts[1])
+            x_he4 = float(parts[2])
+            
+            x_c12 = float(parts[3])
+            x_o16 = float(parts[4])
+            x_ne20 = float(parts[5])
+            x_na23 = float(parts[6])
+            x_mg24 = float(parts[7])
+            
+            # Do your processing here
+            
 
-    return avg_eps_nuc, avg_eps_nu, avg_cv
+    return avg_eps_nuc, avg_eps_nu, avg_cv,x_p,x_he4,x_c12,x_o16,x_ne20,x_na23,x_mg24
 
 
-#eps_nuc ,eps_nu,cv = run_self_heat(2.5e9,1e9)
-#print(eps_nuc,eps_nu,cv)
+#eps_nuc,eps_nu,cv,x_p,x_he4x_c12,x_o16,x_ne20,x_na23,x_mg24 = run_self_heat(1e5,1.5e9,1e9)
+#print(eps_nuc,eps_nu,cv,x_p,x_he4x_c12,x_o16,x_ne20,x_na23,x_mg24)

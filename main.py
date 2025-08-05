@@ -11,7 +11,7 @@ from scipy.signal import savgol_filter
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 
-from integrator import integrator1
+from integrator import integrator1,stepwise_coupled_integrator
 from derivative import find_slope_savgol
 from compute import drho_dt,epsilon_grav,epsilon_nuc_nu,evolution,guess_timelist
 from mpi4py import MPI
@@ -140,7 +140,7 @@ mass_slope,mass_dj_dt,mass_pc,rho_mass,J_mass = plot_all_masses1(rho_values,mome
 #print("mass_dj_dt",mass_dj_dt[1.3])
 
 mass_drho_dt = drho_dt(mass_slope,mass_dj_dt,5,6)
-#print(mass_dj_dt)
+print(mass_dj_dt)
 #print("mass_dhro_dt",mass_drho_dt[1.3])
 #print(rho_mass)
 mass_time_list = guess_timelist(mass_drho_dt,rho_mass)
@@ -153,38 +153,27 @@ for i in mass_time_list.keys():
 
 
 print("-------------------------------")
-#mass_E_gravity = epsilon_grav(mass_drho_dt,mass_pc,rho_mass)
+mass_E_gravity = epsilon_grav(mass_drho_dt,mass_pc,rho_mass)
 #mass_dtemp_dt = evolution(mass_E_gravity=mass_E_gravity,mass_rho = rho_mass)
 #mass_dtemp_dt = {1.3: [862363.6804808223, 862363.6804808223, 862363.6804808223, 862363.6804808223, 862363.6804808223, 865363.3699941944, 868362.4946031364, 871361.1244857997, 900466.0212702699, 926701.0500753771, 935813.2074136983, 947985.695560131, 961207.5581251568, 973437.4355650673, 986714.6407904312, 1015429.1546918534, 1032927.0384756505, 1049449.4239607672, 1067051.5447818756, 1105530.982094518, 1127478.07973327, 1195869.3270120274, 1219174.2157707433, 1271355.0950564267, 1301341.0684796653, 1330366.7406822105, 1361666.0737976297, 1393093.065852007, 1424636.2410679436, 1457394.688659501, 1495773.7900523737, 1529906.7939009375, 1569712.2062435, 1610799.6788300008, 1787094.8931798362, 1833636.2381294498, 1881516.314393551, 1936500.8705666685, 1987125.0335865538, 2046081.761418171, 2106489.3015035503, 2224655.174136148, 2290626.4016951118, 2356919.7046334143, 2506021.998955617, 2579331.4931737576, 2741585.6825141353, 2830666.6307895356, 2914073.8060532394, 3008991.590128385, 3106900.6919727996, 3207829.2835174347, 3311792.6011559945, 3420090.363630483, 3531500.645629793, 3646064.343624919]}
 mass_dtemp_dt = {1.3: [1156120.441065494, 1156120.441065494, 1156120.441065494, 1156120.441065494, 1156120.441065494, 1160135.6903123786, 1164150.921680996, 1168172.0618444202, 1207147.9894203842, 1242273.4748937234, 1254473.07997387, 1270768.5464290695, 1288466.5588089856, 1304840.2716789148, 1322615.8329503264, 1361044.185030056, 1384462.5457662607, 1406565.7623123901, 1430115.837666846, 1481600.344066835, 1510954.4077705943, 1602429.200387344, 1633590.5956927827, 1703354.5876514534, 1743433.2675535588, 1782229.6543743555, 1824051.3285955382, 1866034.4131205904, 1908176.0955355666, 1951934.1866128005, 2003183.5100913853, 2048758.75994134, 2101897.8447056194, 2156742.1747222426, 2391955.3621076285, 2454017.336731757, 2517860.546780623, 2591142.3580331584, 2658612.522249495, 2737164.4485106957, 2817627.076208128, 2974962.96874952, 3062776.8213589555, 3150992.299096158, 3349314.619181404, 3446785.356153355, 3662403.6698225136, 3780728.4729465833, 3891467.479582928, 4017464.029664282, 4147380.542255716, 4281241.324538733, 4419088.061052556, 4562628.5973866945, 4710232.74874877, 4861937.4445397165]}
-print(mass_dtemp_dt)
+#print(mass_dtemp_dt)
 time_array = np.array(mass_time_list_years[1.3])
 dtemp_array = np.array(mass_dtemp_dt[1.3])
-
-plt.figure(figsize=(10, 5))
-plt.plot(time_array, dtemp_array, 'o', label='Original Data')
-plt.savefig("dtemp_dt_dt.png")
-#print(mass_E_gravity)
-results = {}
-
-
-for m in mass_dtemp_dt.keys():
-    epsilon = 0.1
-    t_dynamic = 1/math.sqrt(G*rho_mass[m][0])
-    t_dynamic_list = [1 / math.sqrt(G * rho_mass[m][i]) for i in range(0,len(rho_mass[m]))]
-    t_list = mass_time_list[i]
-    #Time_list,Temperature_list,t_ignition = integrator(mass_dtemp_dt[m],t_list,t_dynamic_list)
-    Time_list,Temperature_list,runaway_detect = integrator1(mass_dtemp_dt[m],t_list,t_dynamic_list)
-    #print(Time_list)
-    #print(Temperature_list)
-    #T0 = temp_dict[m][0]  # initial temperature (first element)
-    #t_span = (0, 1e6)     # adjust integration time span
-    #t_vals, T_vals = integrate_temperature(m, T0, t_span, temp_dict[m], ma_dict[m])
-    #results[m] = (t_vals, T_vals)
-#for i in mass_drho_dt.keys():
-    #evolution(mass_drho_dt[i],c_v,e_nuc,e_nuetrino)
-#print(mass_drho_dt)
-
+for i in mass_drho_dt.keys():
+    drho_dt_i = mass_drho_dt[i]
+    pc =  mass_pc[i]
+    rho = rho_mass[i]
+    time_list = mass_time_list[i]
+    #print(drho_dt_i)
+    #print(pc)
+    #print(rho)
+    Temp_list,time_list,t_heating,runaway_event  = stepwise_coupled_integrator(time_list=time_list,drho_dt=drho_dt_i,pressure_cenrtral=pc,rho=rho,T_initial=1e8,Xc12_init=0.5,Xo16_init=0.5,t_max= 3e8)
+    print(Temp_list)
+    print(time_list)
+    print(t_heating)
+    print(runaway_event)
+    
 #check_lengths_equal([mass_slope,mass_dj_dt,mass_drho_dt])
 print(f"Processed {len(txt_files)} files.")
 print(f"Collected {len(mass_values)} data points.")

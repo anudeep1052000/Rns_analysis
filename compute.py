@@ -1,5 +1,6 @@
 import math
 from call_self_heat import run_self_heat
+import numpy as np
 M_sun = 1.989e33
 
 mass_tolerance = 1e-4
@@ -68,7 +69,7 @@ def epsilon_grav(mass_drho_dt,mass_pc,rho_mass):
 
 def epsilon_nuc_nu(rho,mass):
     #T = guess_central_temperature(rho)
-    eps_nuc, eps_nu, cv = run_self_heat(rho,1e9)
+    eps_nuc, eps_nu, cv = run_self_heat(rho,1e9,)
     print(eps_nuc,eps_nu,cv)
     print("Mass = "+str(mass)+"rho ="+str(rho)+"successfully done")
     return eps_nuc,eps_nu,cv
