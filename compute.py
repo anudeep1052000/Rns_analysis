@@ -1,103 +1,135 @@
 import math
-from call_self_heat import run_self_heat
 import numpy as np
-M_sun = 1.989e33
+from call_self_heat import run_self_heat
+
+# Physical constants
+M_sun = 1.989e33          # Solar mass in grams
+C = 2.99792458e10         # Speed of light in cm/s
+G = 6.67430e-8            # Gravitational constant in cm^3/g/s^2
+seconds_in_year = 365.25 * 24 * 3600
 
 mass_tolerance = 1e-4
 
-C = 2.99792458e10       # speed of light in cm/s
-G = 6.67430e-8          # gravitational constant in cm^3 / g / s^2
-seconds_in_year = 365.25 * 24 * 3600 
+
+def compute_breakup_omega(mass, radius):
+    """
+    Compute the breakup angular velocity (rad/s) for a star.
+    """
+    M = mass * M_sun
+    return math.sqrt(G * M / (radius * 1e5)**3)
 
 
-def compute_breakup_omega(mass,Radius):
-    M = mass*M_sun
-    omega = math.sqrt(G * M / (Radius*10**5)**3)
-    return omega
-
-def drho_dt(mass_slope,mass_dj_dt,e_nuc,e_nuetrino):
+def drho_dt(mass_slope, mass_dj_dt, e_nuc, e_neutrino):
+    """
+    Compute d(rho)/dt for each mass sequence.
+    """
     mass_drho_dt = {}
-    for i in mass_slope.keys():
+    for mass_key in mass_slope.keys():
         slope_drho_dt = []
-        a = len(mass_slope)
-        b = len(mass_dj_dt)
-        #print(a)
-        #print(b)
-        for j in  range(0,len(mass_slope[i])):
-            drho = mass_slope[i][j] * mass_dj_dt[i][j]
+        for j in range(len(mass_slope[mass_key])):
+            drho = mass_slope[mass_key][j] * mass_dj_dt[mass_key][j]
             slope_drho_dt.append(drho)
-        mass_drho_dt[i] = slope_drho_dt
-    #print(mass_drho_dt)
+        mass_drho_dt[mass_key] = slope_drho_dt
     return mass_drho_dt
-    #dT_c_dt = (1 / C_V) * [ e_nuc- e_nuetrino + (P_c / rho_c^2) * (drho_c/dt) ]
-
-def guess_timelist(mass_dhro_dt,rho_mass):
-      mass_time_list = {}
-      for i in mass_dhro_dt.keys():
-          time_list = [0.0]
-          for j in range(1,len(mass_dhro_dt[i])):
-              if j==0:
-                  time_list[j] = 0
-              else:
-                  if abs(mass_dhro_dt[i][j])<1e-30:
-                      dt =1e3
-                  else:
-                      dt = (rho_mass[i][j]-rho_mass[i][j-1])/mass_dhro_dt[i][j]
-                  if(dt<0):
-                      dt = abs(dt)
-                      
-                  elif(dt==0):
-                      dt =1e3
-                  time_list_temp = time_list[j-1]+dt
-                  if math.isclose(time_list_temp, time_list[-1], rel_tol=1e-12, abs_tol=1e-6):
-                      time_list_temp+= 1e30
-                      
-                  time_list.append(time_list_temp)
-          mass_time_list[i] = time_list
-      return mass_time_list
 
 
+def guess_timelist(mass_drho_dt, rho_mass):
+    """
+    Estimate an evolutionary time list based on density change rates.
+    """
+    mass_time_list = {}
+    for mass_key in mass_drho_dt.keys():
+        time_list = [0.0]
+        for j in range(1, len(mass_drho_dt[mass_key])):
+            # Avoid division by zero or near-zero derivatives
+            if abs(mass_drho_dt[mass_key][j]) < 1e-30:
+                dt = 1e3
+            else:
+                dt = (rho_mass[mass_key][j] - rho_mass[mass_key][j-1]) / \
+                     (mass_drho_dt[mass_key][j] - mass_drho_dt[mass_key][j-1])
 
-def epsilon_grav(mass_drho_dt,mass_pc,rho_mass):
-    mass_E_gravity ={}
-    for i in mass_drho_dt.keys():
-        E_grvaity = (np.array(mass_drho_dt[i])*np.array(mass_pc[i]))/np.array(rho_mass[i])**2
-        mass_E_gravity[i] = E_grvaity
+            dt = abs(dt) if dt != 0 else 1e3
+            time_list.append(time_list[-1] + dt)
+
+        mass_time_list[mass_key] = time_list
+    return mass_time_list
+
+
+def remove_near_duplicates_sorted(rho, J, radius, omega, pc, tol=1e4):
+    """
+    Remove near-duplicate rho values from sorted arrays by clustering points
+    within 'tol' and keeping representative values.
+    """
+    reduced_rho, reduced_J, reduced_radius, reduced_omega, reduced_pc = [], [], [], [], []
+    cluster_rho, cluster_J, cluster_radius, cluster_omega, cluster_pc = \
+        [rho[0]], [J[0]], [radius[0]], [omega[0]], [pc[0]]
+
+    for i in range(1, len(rho)):
+        if abs(rho[i] - cluster_rho[-1]) <= tol:
+            cluster_rho.append(rho[i])
+            cluster_J.append(J[i])
+            cluster_radius.append(radius[i])
+            cluster_omega.append(omega[i])
+            cluster_pc.append(pc[i])
+        else:
+            reduced_rho.append(np.mean(cluster_rho))
+            reduced_J.append(np.max(cluster_J))
+            reduced_radius.append(np.max(cluster_radius))
+            reduced_omega.append(np.max(cluster_omega))
+            reduced_pc.append(np.max(cluster_pc))
+            cluster_rho, cluster_J, cluster_radius, cluster_omega, cluster_pc = \
+                [rho[i]], [J[i]], [radius[i]], [omega[i]], [pc[i]]
+
+    # Save final cluster
+    reduced_rho.append(np.mean(cluster_rho))
+    reduced_J.append(np.max(cluster_J))
+    reduced_radius.append(np.max(cluster_radius))
+    reduced_omega.append(np.max(cluster_omega))
+    reduced_pc.append(np.max(cluster_pc))
+
+    return (np.array(reduced_rho), np.array(reduced_J),
+            np.array(reduced_radius), np.array(reduced_omega), np.array(reduced_pc))
+
+
+def epsilon_grav(mass_drho_dt, mass_pc, rho_mass):
+    """
+    Compute gravitational energy release rate.
+    """
+    mass_E_gravity = {}
+    for mass_key in mass_drho_dt.keys():
+        E_gravity = (np.array(mass_drho_dt[mass_key]) * np.array(mass_pc[mass_key])) / \
+                    np.array(rho_mass[mass_key])**2
+        mass_E_gravity[mass_key] = E_gravity
     return mass_E_gravity
 
 
+def epsilon_nuc_nu(rho, mass):
+    """
+    Compute nuclear and neutrino energy generation rates.
+    """
+    eps_nuc, eps_nu, cv = run_self_heat(rho, 1e9)
+    print(eps_nuc, eps_nu, cv)
+    print(f"Mass = {mass}, rho = {rho} successfully done")
+    return eps_nuc, eps_nu, cv
 
-def epsilon_nuc_nu(rho,mass):
-    #T = guess_central_temperature(rho)
-    eps_nuc, eps_nu, cv = run_self_heat(rho,1e9,)
-    print(eps_nuc,eps_nu,cv)
-    print("Mass = "+str(mass)+"rho ="+str(rho)+"successfully done")
-    return eps_nuc,eps_nu,cv
 
-
-def evolution(mass_E_gravity,mass_rho):
+def evolution(mass_E_gravity, mass_rho):
+    """
+    Compute temperature evolution rate for each mass sequence.
+    """
     mass_Temp_dt = {}
-    for i in mass_E_gravity.keys():
+    for mass_key in mass_E_gravity.keys():
         dTemp_dt = []
-        rho_temp = mass_rho[i]
-        print(rho_temp)
-        for j  in range(0,len(rho_temp)):
-            eps_nuc,eps_nu,cv = epsilon_nuc_nu(rho_temp[j],i)
-            eps_gravity_temp  = mass_E_gravity[i][j]
-            dTemp_dt1 = (eps_nuc-eps_nu+eps_gravity_temp)/cv
-            dTemp_dt.append(dTemp_dt1)
-        mass_Temp_dt[i] = dTemp_dt
+        for j, rho_value in enumerate(mass_rho[mass_key]):
+            eps_nuc, eps_nu, cv = epsilon_nuc_nu(rho_value, mass_key)
+            dTemp_dt.append((eps_nuc - eps_nu + mass_E_gravity[mass_key][j]) / cv)
+        mass_Temp_dt[mass_key] = dTemp_dt
     return mass_Temp_dt
+
 
 def check_lengths_equal(dicts):
     """
-    Check if all the dictionaries have lists of the same length for each mass key.
-
-    Parameters:
-        dicts : list of dictionaries to compare (e.g., [mass_slope, mass_dj_dt, mass_drho_dt])
-
-    Returns:
-        True if all keys exist in all dicts and have same length of lists, else False with details.
+    Check if all dictionaries have lists of the same length for each mass key.
     """
     keys = dicts[0].keys()
     for key in keys:
@@ -108,49 +140,3 @@ def check_lengths_equal(dicts):
     print("✅ All dictionaries have lists of equal length for each mass key.")
     return True
 
-
-def evolution1(mass_E_gravity, mass_rho):
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-
-    # 1) Prepare tasks as list of (mass, rho, idx) for indexing
-    tasks = []
-    for mass in mass_rho:
-        print(mass)
-        rhos = mass_rho[mass]
-        for idx, rho in enumerate(rhos):
-            tasks.append((mass, rho, idx))
-
-    # 2) Scatter tasks evenly to each rank
-    my_tasks = tasks[rank::size]
-
-    # 3) Each rank computes results for their tasks
-    my_results = []
-    for mass, rho, idx in my_tasks:
-        eps_nuc, eps_nu, cv = epsilon_nuc_nu(rho, mass)
-        eps_gravity_temp = mass_E_gravity[mass][idx]
-        dTemp_dt = (eps_nuc - eps_nu + eps_gravity_temp) / cv
-        my_results.append((mass, idx, dTemp_dt))
-
-    # 4) Gather all results back to rank 0
-    all_results = comm.gather(my_results, root=0)
-
-    # 5) Rank 0 reassembles the dictionary
-    mass_Temp_dt = None
-    if rank == 0:
-        mass_Temp_dt = {}
-        # Flatten list of lists
-        flat_results = [item for sublist in all_results for item in sublist]
-        # Group by mass and sort by index
-        for mass, idx, dTemp_dt in flat_results:
-            if mass not in mass_Temp_dt:
-                mass_Temp_dt[mass] = []
-        # Initialize empty lists with the right size
-        for mass in mass_Temp_dt:
-            mass_Temp_dt[mass] = [0] * len(mass_rho[mass])
-        # Fill in the values at correct indices
-        for mass, idx, dTemp_dt in flat_results:
-            mass_Temp_dt[mass][idx] = dTemp_dt
-
-    return mass_Temp_dt
